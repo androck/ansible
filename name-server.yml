@@ -1,0 +1,32 @@
+---
+- hosts: ios
+  gather_facts: no
+
+  vars:
+    dns_servers:
+      - ip name-server {{dns_server1}}
+      - ip name-server {{dns_server2}}
+
+  tasks:
+  - name: get the current name-server configs
+    ios_command:
+      commands:
+        - "show running-config full | include ip name-server"
+    register: get_config
+
+  - debug: var=get_config.stdout_lines[0][0]
+
+  - name: set name-server commands
+    with_items: "{{ dns_servers }}"
+    ios_config:
+      lines:
+        - "{{ item }}"
+    register: set_dns
+
+  - name: remove name-server commands
+    when: "(get_config.stdout_lines[0][0] != '') and (item not in dns_servers)"
+    with_items: "{{ get_config.stdout_lines[0] }}"
+    register: removed_dns
+    ios_config:
+      lines:
+        - "no {{ item }}"
